@@ -1,0 +1,104 @@
+# PS5 ReLapse Fast Rest
+
+One-action PS5 firmware 13.60 chain combining ReLapse, a persistent headless ELF
+loader, and an optimized Byepervisor Reborn handoff into automatic Rest Mode.
+
+This project is an integration and optimization of the credited upstream work;
+it is not a claim of authorship over ReLapse or Byepervisor Reborn.
+
+## What it does
+
+```text
+Settings → User's Guide
+  → WebKit userland exploit
+  → ReLapse kernel R/W
+  → persistent headless ELF service on TCP 9021
+  → optimized Byepervisor resume hook
+  → automatic Rest Mode
+  → wake with the hypervisor defeated and port 9021 available
+```
+
+There is no payload menu, Payload Manager launch, browser interaction, or
+standalone kstuff in this release.
+
+## Requirements
+
+- PS5 system software **13.60**
+- A PC and PS5 on the same local network
+- Python 3.10 or newer
+- The PS5 must be configured to reach the PC-hosted User's Guide
+
+## Run
+
+Download `ps5-relapse-fast-rest-v1.0.0.py` from the release and run:
+
+```powershell
+python ps5-relapse-fast-rest-v1.0.0.py --no-dns --ip YOUR_PC_IP
+```
+
+Then open **Settings → User's Guide** on the PS5. The console enters Rest Mode
+automatically after the Byepervisor resume hook is armed. Wake it normally.
+
+> Never retry ReLapse after a kernel attempt in the same boot. Fully reboot the
+> PS5 before trying again.
+
+## Measured timing
+
+Measured on one retail PS5 running 13.60. Results vary with WebKit heap layout,
+networking, and whether the first WebKit attempt succeeds.
+
+| Stage | Fast Rest v1.0.0 |
+|---|---:|
+| Page open → WebKit ARW | 0.55 s |
+| Page open → kernel R/W established | 1.54 s |
+| Persistent loader spawn | 19 ms |
+| Byepervisor process spawn | 16 ms |
+| Byepervisor process activation | 223 ms |
+| Resume-hook setup | 10 ms |
+| Standby request | 3 ms |
+| **Page open → automatic Rest Mode** | **~1.8 s** |
+
+The timing is a best observed first-attempt result, not a guarantee.
+
+## Compared with stock ReLapse + Byepervisor Reborn
+
+| Behavior | Stock projects used separately | Fast Rest v1.0.0 |
+|---|---|---|
+| Operator flow | Run ReLapse, transfer/start loader and Byepervisor, enter Rest Mode manually | Open User's Guide once |
+| ELF delivery | Separate transfer/launcher step | Embedded and started directly from memory |
+| Post-launch loader | Depends on the selected external loader | Headless service starts automatically and survives Rest Mode |
+| Byepervisor setup | Original page-by-page kernel-text permission walk | Page-size-aware PDE/PTE walk |
+| Measured permission walk | ~444 ms | ~10 ms |
+| Rest Mode | Manual after hook setup | Requested only after the resume hook is armed |
+| UI | Depends on host/loader choices | No menu or interactive payload selection |
+| Wake result | Hypervisor defeat; loader availability depends on setup | Hypervisor defeated with TCP 9021 restored |
+
+The speedup comes primarily from direct in-memory spawning, eliminating manual
+handoffs, and replacing repeated page-table walks with a page-size-aware walker.
+The ReLapse race strategy and firmware offsets are not made more aggressive.
+
+## Integrity
+
+Published SHA-256 values are in [`checksums.txt`](checksums.txt).
+
+## Source layout
+
+- `source/launcher/` — combined headless loader/bootstrap source
+- `source/byepervisor/` — Byepervisor integration and optimized walker source
+- `dist/` — ready-to-run host and pinned Byepervisor ELF
+
+Builds require the PS5 Payload SDK. See the source Makefiles for the expected
+`PS5_PAYLOAD_SDK` environment variable.
+
+## Credits
+
+- **ReLapse / ps5-kexp / WebKit remote loader:** itsPLK and contributors
+- **Byepervisor Reborn:** PS5Dev and contributors
+- **PS5 ELF loader:** John Törnblom and contributors
+- **PS5 Payload SDK:** ps5-payload-dev contributors
+
+See [`THIRD_PARTY.md`](THIRD_PARTY.md) for upstream links and licensing notes.
+
+## License
+
+GPL-3.0. Third-party components remain under their respective licenses.
